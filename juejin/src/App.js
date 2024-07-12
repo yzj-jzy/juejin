@@ -1,6 +1,7 @@
 import './App.css';
 import { getCategories, getArticles } from './fake-api';
 import { useEffect, useState } from 'react';
+import Page from './component/Page'
 
 function App() {
   const [articles, setArticles] = useState([]);
@@ -96,6 +97,7 @@ function App() {
           <div key={article.article_info.id} className="article">
             <h2>{article.article_info.title}</h2>
             <p>{article.article_info.content}</p>
+            <Page codeString={article.article_content}> </Page>
           </div>
         ))}
       </div>
