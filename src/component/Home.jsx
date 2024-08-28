@@ -9,6 +9,9 @@ const Home = () => {
   const [sortBy, setSortBy] = useState('hot'); // Default sort by hot
   const [categoriesData, setCategoriesData] = useState([]); // State to store categories data
   const [childCategories, setChildCategories] = useState([]); // State to store child categories
+  const [page, setPage] = useState(1); // State to store current page
+  const [loading, setLoading] = useState(false); // State to manage loading state
+  const [hasMore, setHasMore] = useState(true); // State to check if there are more articles to load
   const navigate = useNavigate();
   const { primaryCategoryId: primaryCategoryIdParam, secondaryCategoryId: secondaryCategoryIdParam } = useParams(); // Get primary and secondary category IDs from route params
 
@@ -33,26 +36,34 @@ const Home = () => {
   useEffect(() => {
     // Fetch articles based on primary and secondary category IDs
     const fetchArticles = async () => {
+      if (loading || !hasMore) return; // Prevent multiple requests if already loading or no more articles
+      setLoading(true);
+      
       try {
         let categoryId = primaryCategoryId; // Default to primary category ID
         if (secondaryCategoryId) {
           categoryId = secondaryCategoryId; // If secondary category ID is present, use it
         }
 
-        // Call API to get articles based on category ID and sort order
-        const result = await getArticles(categoryId, sortBy); // Replace with actual API call
+        // Call API to get articles based on category ID, sort order, and page
+        const result = await getArticles(categoryId, sortBy, page); // Assuming getArticles supports pagination
         if (result.code === 0) {
-          setArticles(result.data.articles);
+          setArticles(prevArticles => [...prevArticles, ...result.data.articles]);
+          if (result.data.articles.length === 0) {
+            setHasMore(false); // No more articles to load
+          }
         } else {
           throw new Error('Failed to fetch articles');
         }
       } catch (error) {
         console.error('Failed to fetch articles:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchArticles();
-  }, [primaryCategoryId, secondaryCategoryId, sortBy]);
+  }, [primaryCategoryId, secondaryCategoryId, sortBy, page]);
 
   useEffect(() => {
     // Set primary and secondary category IDs based on route params
@@ -79,16 +90,25 @@ const Home = () => {
     } else {
       setChildCategories([]);
     }
+    setPage(1); // Reset page to 1 when category changes
+    setArticles([]); // Clear articles when category changes
+    setHasMore(true); // Reset hasMore when category changes
     navigate(`/juejin/${newPrimaryCategoryId}`); // Navigate to new primary category route
   };
 
   const handleSecondaryCategoryClick = (newSecondaryCategoryId) => {
     setSecondaryCategoryId(newSecondaryCategoryId);
+    setPage(1); // Reset page to 1 when category changes
+    setArticles([]); // Clear articles when category changes
+    setHasMore(true); // Reset hasMore when category changes
     navigate(`/juejin/${primaryCategoryId}/${newSecondaryCategoryId}`); // Navigate to new secondary category route
   };
 
   const handleSortByClick = (newSortBy) => {
     setSortBy(newSortBy);
+    setPage(1); // Reset page to 1 when sort order changes
+    setArticles([]); // Clear articles when sort order changes
+    setHasMore(true); // Reset hasMore when sort order changes
     if (secondaryCategoryId) {
       navigate(`/juejin/${primaryCategoryId}/${secondaryCategoryId}?sort=${newSortBy}`); // Navigate to new sort route with secondary category ID
     } else {
@@ -99,6 +119,24 @@ const Home = () => {
   const handleArticleClick = (articleId) => {
     navigate(`/article/${articleId}`);
   };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+
+      if (scrollTop + clientHeight >= scrollHeight - 10 && hasMore && !loading) { // Adjust the threshold as needed
+        console.log('滚动到底部了');
+        setPage(prevPage => prevPage + 1); // Load the next page
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [hasMore, loading]);
 
   return (
     <div className="container mx-auto p-4 bg-white">
@@ -164,7 +202,7 @@ const Home = () => {
             </div>
           ))}
         </div>
-
+        {loading && <div>加载中...</div>}
       </div>
 
     </div>
